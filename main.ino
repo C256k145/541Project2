@@ -1,21 +1,59 @@
-int out_pin = 5;
-float output = 11;
-char serial_data = 0;
+#include "Arduino.h"
 
-float findDutyCycle(float desired_voltage) {
-//  somefunc(desired_voltage);
-  return(0.5);
+// int out_pin = 5;
+int duty_cycle_pin = 5;
+// int voltage_adjust_pin = 3;
+int input_pin = A7;
+char serial_data = 0;
+float duty_cycle = 0.5;
+
+float output = 11;
+float max_voltage = 17.0;
+float min_voltage = 12.0;
+float arduino_5V = 4.88;
+
+float R_small = 1000000;
+float R_big = 3000000;
+
+// float R1 = 0;
+// float R2 = 0;
+// float gain = (R1 + R2)/(R2);
+// float v_ref = 7.0;
+
+void writeDutyCycle(float value) {
+  int write_val = round(value*255);
+  analogWrite(duty_cycle_pin, write_val);
 }
 
-void writeDutyCycle(float duty_cycle) {
-  if(duty_cycle > 0.25 && duty_cycle < 0.75) {
-    int write_val = round(duty_cycle*255);
-    analogWrite(out_pin, write_val);
+float measureVoltage() {
+  float sensor = analogRead(input_pin);
+  float measured_voltage = input_pin*(255/arduino_5V);
+  float v_load = ((R_big+R_small)/R_small)*measured_voltage;
+  return(v_load);
+}
+
+float adjustDutyCycle(float v_load) {
+  if(v_load < output) {
+    if(duty_cycle == 0) {
+      Serial.println("Minimum Duty Cycle Reached");
+    }
+    else {
+      duty_cycle -= 0.01;
+    }
+  }
+  else {
+    if(duty_cycle > 0.75) {
+      Serial.println("Maximum Duty Cycle Reached");
+    }
+    else {
+      duty_cycle += 0.01;
+    }
   }
 }
 
 // Source: https://playground.arduino.cc/Code/PwmFrequency/
-void set_pwm(int pin, int divisor) {
+// This function allows us to adjust the PWM frequency to one of several values.
+void setPwmFrequency(int pin, int divisor) {
   byte mode;
   if(pin == 5 || pin == 6 || pin == 9 || pin == 10) {
     switch(divisor) {
@@ -46,12 +84,12 @@ void set_pwm(int pin, int divisor) {
   }
 }
 
-
-
 void setup() {
-  pinMode(out_pin, OUTPUT);
+  pinMode(duty_cycle_pin, OUTPUT);
+  // pinMode(voltage_adjust_pin, OUTPUT);
+  pinMode(input_pin, INPUT);
   Serial.begin(9600);
-  set_pwm(5,1);
+  setPwmFrequency(5,1); // Sets pin 5 to 62.5 KHz
 }
 
 void loop() {
@@ -61,21 +99,18 @@ void loop() {
 
     switch(serial_data) {
       case 'd':
-        if(output < 22) {
+        if(output < max_voltage) {
           output += 0.5;
         }
         break;
       case 'a':
-        if(output > 11) {
+        if(output > min_voltage) {
           output -= 0.5;
         }
         break;
     }
 
-    writeDutyCycle(findDutyCycle(output));
-    Serial.print("Desired Load voltage: ");
-    Serial.print(output); Serial.println(" V");
-    // measure_voltage();
-    Serial.println();
+    adjustDutyCycle(measureVoltage());
   }
+  writeDutyCycle(duty_cycle);
 }
