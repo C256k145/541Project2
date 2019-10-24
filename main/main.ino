@@ -1,7 +1,7 @@
 #include "Arduino.h"
 
 int duty_cycle_pin = 5;
-int input_pin = A5;
+int input_pin = A4;
 char serial_data = 0;
 float duty_cycle = 0.0;
 int arr_index = 0;
@@ -9,11 +9,13 @@ int arr_index = 0;
 float output = 12;
 float max_voltage = 17.0;
 float min_voltage = 12.0;
-float arduino_5V = 4.88;
+float arduino_5V = 4.97;
 float actual = 0;
 
-float R_small = 1010000;
-float R_big = 2693000;
+float measured_voltage = 0;
+
+float R_small = 1.01;
+float R_big = 2.693;
 
 void writeDutyCycle(float value) {
   value = (1-value);
@@ -23,12 +25,12 @@ void writeDutyCycle(float value) {
 
 float measureVoltage() {
   float v_load = 0;
-  for(int i = 0;i < 10; i++) {
-    int sensor = analogRead(input_pin);
-    float measured_voltage = sensor*(arduino_5V/1024.0);
+  for(int i = 0;i < 100; i++) {
+    float sensor = analogRead(input_pin);
+    measured_voltage = sensor*(arduino_5V/1024.0); 
     v_load += ((R_big+R_small)/R_small)*measured_voltage;
   }
-  return(v_load/10);
+  return(v_load/100);
 }
 
 float adjustDutyCycle(float v_load) {
@@ -84,12 +86,14 @@ void setup() {
   pinMode(input_pin, INPUT);
   Serial.begin(9600);
   setPwmFrequency(duty_cycle_pin, 1); // Sets pwm output to 62.5 KHz
-//  firstSetup();
 }
 
 void loop() {
-  delay(1);
-  actual = measureVoltage();
+//  delay(1);
+// The arduino was consistently reading the voltage lower than it should,
+// so 'fudge' was found as an average of the actual/measured values from 12-17
+  float fudge =1.07595;                  
+  actual = measureVoltage()*fudge;
   adjustDutyCycle(actual);
   writeDutyCycle(duty_cycle);
   if(Serial.available() > 0) {
@@ -108,7 +112,7 @@ void loop() {
         break;
     }
     Serial.print("Actual: ");
-    Serial.println(measureVoltage());
+    Serial.println(actual);
     Serial.print("Desired Voltage: ");
     Serial.println(output);
     Serial.print("Duty Cycle: ");
