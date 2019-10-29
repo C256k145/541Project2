@@ -1,17 +1,22 @@
 #include "Arduino.h"
 
 int duty_cycle_pin = 5;
-int input_pin = A4;
-char serial_data = 0;
+int input_pin = A5;
+String serial_data;
 float duty_cycle = 0.0;
 int arr_index = 0;
+
+// The arduino was consistently reading the voltage lower than it should,
+// so 'fudge' was found as an average of the actual/measured values from 12-17 with a load of 450 mA
+float fudge = 1.07595;  
 
 float output = 12;
 float max_voltage = 17.0;
 float min_voltage = 12.0;
-float arduino_5V = 4.97;
+float max_duty_cycle = 0.6;
+float min_duty_cycle = 0;
+float arduino_5V = 4.81;
 float actual = 0;
-
 float measured_voltage = 0;
 
 float R_small = 1.01;
@@ -35,13 +40,13 @@ float measureVoltage() {
 
 float adjustDutyCycle(float v_load) {
   if(v_load > output) {
-    if(duty_cycle<=0)
+    if(duty_cycle<=min_duty_cycle)
       duty_cycle += 0.001;
     else
       duty_cycle -= 0.001;
   }
   else if(v_load < output) {
-    if(duty_cycle>=0.6)
+    if(duty_cycle>=max_duty_cycle)
       duty_cycle -= 0.001;
     else
       duty_cycle += 0.001;
@@ -88,29 +93,32 @@ void setup() {
   setPwmFrequency(duty_cycle_pin, 1); // Sets pwm output to 62.5 KHz
 }
 
-void loop() {
-//  delay(1);
-// The arduino was consistently reading the voltage lower than it should,
-// so 'fudge' was found as an average of the actual/measured values from 12-17
-  float fudge =1.07595;                  
+void loop() {                
   actual = measureVoltage()*fudge;
   adjustDutyCycle(actual);
   writeDutyCycle(duty_cycle);
+  
   if(Serial.available() > 0) {
-    serial_data = Serial.read();
+    serial_data = Serial.readString();
+    if(serial_data == "\n");
+    else if(serial_data == "d\n")
+      output += 0.5;
+    else if(serial_data == "a\n")
+      output -= 0.5;
+    else
+      output = serial_data.toFloat();
+    
+    if(output < min_voltage)
+      output = min_voltage;
+    else if(output > max_voltage)
+      output = max_voltage;
 
-    switch(serial_data) {
-      case 'd':
-        if(output < max_voltage) {
-          output += 0.5;
-        }
-        break;
-      case 'a':
-        if(output > min_voltage) {
-          output -= 0.5;
-        }
-        break;
-    }
+    // These three lines are repeated here because the measured voltage needs to update on every loop, and again 
+    // when the desired output is changed
+    actual = measureVoltage()*fudge; 
+    adjustDutyCycle(actual);
+    writeDutyCycle(duty_cycle);
+    
     Serial.print("Actual: ");
     Serial.println(actual);
     Serial.print("Desired Voltage: ");
