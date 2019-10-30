@@ -1,26 +1,26 @@
 #include "Arduino.h"
 
 int duty_cycle_pin = 5;
-int input_pin = A5;
+int input_pin = A4;
 String serial_data;
 float duty_cycle = 0.0;
 int arr_index = 0;
 
 // The arduino was consistently reading the voltage lower than it should,
 // so 'fudge' was found as an average of the actual/measured values from 12-17 with a load of 450 mA
-float fudge = 1.07595;  
+float fudge = 1.03;  
 
 float output = 12;
 float max_voltage = 17.0;
 float min_voltage = 12.0;
 float max_duty_cycle = 0.6;
 float min_duty_cycle = 0;
-float arduino_5V = 4.81;
+float arduino_5V = 4.87;
 float actual = 0;
 float measured_voltage = 0;
 
-float R_small = 1.01;
-float R_big = 2.693;
+float R_small = 1.042;
+float R_big = 2.702;
 
 void writeDutyCycle(float value) {
   value = (1-value);
@@ -95,6 +95,7 @@ void setup() {
 
 void loop() {                
   actual = measureVoltage()*fudge;
+//  actual = (-5.6 + 1.79*(actual) - 0.0281*(actual*actual)) + 0.5;
   adjustDutyCycle(actual);
   writeDutyCycle(duty_cycle);
   
@@ -112,7 +113,7 @@ void loop() {
       output = min_voltage;
     else if(output > max_voltage)
       output = max_voltage;
-
+      
     // These three lines are repeated here because the measured voltage needs to update on every loop, and again 
     // when the desired output is changed
     actual = measureVoltage()*fudge; 
